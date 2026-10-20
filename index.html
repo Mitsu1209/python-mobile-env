@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <!-- スマホ向け：横幅を画面に合わせ、意図しないズームを防ぐ -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>スマホ向け Python 実行環境</title>
+    <!-- Pyodideのロード -->
+    <script src="https://cdn.jsdelivr.net/pyodide/v0.25.0/full/pyodide.js"></script>
+    <style>
+        body {
+            font-family: sans-serif;
+            margin: 0;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            height: 95vh;
+            background-color: #f0f2f5;
+        }
+        #editor-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            margin-bottom: 10px;
+        }
+        /* スマホでの自動ズームを防ぐため font-size: 16px は必須 */
+        textarea {
+            flex: 1;
+            width: 100%;
+            font-size: 16px;
+            font-family: monospace;
+            padding: 10px;
+            box-sizing: border-box;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            resize: none;
+        }
+        .toolbar {
+            display: flex;
+            gap: 5px;
+            margin-top: 5px;
+        }
+        button {
+            padding: 10px;
+            font-size: 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            color: white;
+            font-weight: bold;
+        }
+        .helper-btn { background-color: #6c757d; flex: 1; }
+        .run-btn { background-color: #28a745; flex: 2; }
+        .run-btn:disabled { background-color: #6c757d; opacity: 0.5; }
+        #output {
+            flex: 1;
+            background-color: #1e1e1e;
+            color: #d4d4d4;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 14px;
+            white-space: pre-wrap;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="editor-container">
+        <!-- 初期コードをinput()のテスト用に変更 -->
+        <textarea id="code" placeholder="ここにPythonコードを入力...">name = input("お名前を入力してください: ")
+print(f"こんにちは、{name}さん！")</textarea>
+        
+        <div class="toolbar">
+            <button class="helper-btn" onclick="insertText('    ')">Tab</button>
+            <button class="helper-btn" onclick="insertText(':')">:</button>
+            <button class="helper-btn" onclick="insertText('\'')">'</button>
+            <button class="helper-btn" onclick="insertText('\"')">"</button>
+        </div>
+        <div class="toolbar">
+            <button id="runBtn" class="run-btn" onclick="runPython()" disabled>Pyodide 準備中...</button>
+        </div>
+    </div>
+
+    <div id="output">環境を読み込んでいます。数十秒かかる場合があります...<br></div>
+
+    <script>
+        let pyodide;
+
+        // 入力補助ボタンの処理（カーソル位置に文字を挿入）
+        function insertText(text) {
+            const textarea = document.getElementById("code");
+            const start = textarea.selectionStart;
+            const end = textarea.selectionEnd;
+            const value = textarea.value;
+            textarea.value = value.substring(0, start) + text + value.substring(end);
+            textarea.selectionStart = textarea.selectionEnd = start + text.length;
+            textarea.focus();
+        }
+
+        // Pyodideの初期化と入出力のキャプチャ設定
+        async function initPyodide() {
+            const outputDiv = document.getElementById("output");
+            try {
+                pyodide = await loadPyodide({
+                    stdin: () => prompt("Pythonからの入力要求:"), // input()関数が呼ばれた時の処理
+                    stdout: (msg) => { outputDiv.innerHTML += msg + "<br>"; },
+                    stderr: (msg) => { outputDiv.innerHTML += "<span style='color:#ff6b6b;'>" + msg + "</span><br>"; }
+                });
+                outputDiv.innerHTML = "準備完了！コードを実行できます。<br>----------------<br>";
+                
+                const runBtn = document.getElementById("runBtn");
+                runBtn.innerText = "コードを実行 ▶";
+                runBtn.disabled = false;
+            } catch (err) {
+                outputDiv.innerHTML += "<span style='color:red;'>初期化エラー: " + err + "</span><br>";
+            }
+        }
+
+        // Pythonコードの実行処理
+        async function runPython() {
+            if (!pyodide) return;
+            const code = document.getElementById("code").value;
+            const outputDiv = document.getElementById("output");
+            
+            outputDiv.innerHTML = ""; // 実行前の出力をクリア
+            
+            try {
+                await pyodide.runPythonAsync(code);
+            } catch (err) {
+                // 文法エラーなど
+                outputDiv.innerHTML += "<span style='color:#ff6b6b;'>" + err.message + "</span>";
+            }
+        }
+
+        // ページ読み込み時にPyodideを初期化
+        initPyodide();
+    </script>
+
+</body>
+</html>
